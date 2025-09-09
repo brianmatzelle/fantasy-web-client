@@ -142,9 +142,9 @@ export default function ChatInterface() {
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-[#1E201E]">
+    <div className="flex flex-col h-screen bg-[#0F1014]">
       {/* Header */}
-      <div className="border-b border-[#3C3D37]/50 px-6 py-4 bg-[#1E201E]/95 backdrop-blur-sm">
+      <div className="border-b border-[#1A1C20]/50 px-6 py-4 bg-[#0F1014]/95 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-[#ECDFCC] tracking-tight">Fantasy Football AI</h1>
@@ -192,7 +192,7 @@ export default function ChatInterface() {
                     "max-w-[75%] rounded-2xl px-4 py-3 shadow-sm",
                     message.type === 'user' 
                       ? "bg-[#697565] text-[#ECDFCC] rounded-br-md" 
-                      : "bg-[#3C3D37] text-[#ECDFCC] rounded-bl-md border border-[#3C3D37]/50"
+                      : "bg-[#1A1C20] text-[#ECDFCC] rounded-bl-md border border-[#1A1C20]/50"
                   )}>
                     <div className="prose prose-sm max-w-none">
                       <div className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -223,7 +223,7 @@ export default function ChatInterface() {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-[#3C3D37]/50 bg-[#1E201E] shadow-lg">
+      <div className="border-t border-[#1A1C20]/50 bg-[#0F1014] shadow-lg">
         <div className="max-w-4xl mx-auto p-6">
           {/* Quick Start Prompts - moved here above input */}
           {messages.length === 0 && (
@@ -235,7 +235,7 @@ export default function ChatInterface() {
                     key={prompt}
                     onClick={() => setInput(prompt)}
                     disabled={isLoading}
-                    className="group p-3 text-left rounded-xl bg-[#3C3D37]/50 hover:bg-[#3C3D37] border border-[#3C3D37]/30 hover:border-[#697565]/30 transition-all duration-200 hover:shadow-md"
+                    className="group p-3 text-left rounded-xl bg-[#1A1C20]/50 hover:bg-[#1A1C20] border border-[#1A1C20]/30 hover:border-[#697565]/30 transition-all duration-200 hover:shadow-md"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-2 h-2 rounded-full bg-[#697565] group-hover:bg-[#697565] transition-colors"></div>
@@ -254,7 +254,7 @@ export default function ChatInterface() {
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Message Fantasy Football AI..."
                 disabled={isLoading}
-                className="w-full h-14 text-base pl-4 pr-12 rounded-2xl border-[#3C3D37]/50 bg-[#3C3D37]/30 backdrop-blur-sm focus:bg-[#3C3D37]/50 focus:border-[#697565]/50 transition-all duration-200"
+                className="w-full h-14 text-base pl-4 pr-12 rounded-2xl border-[#1A1C20]/50 bg-[#1A1C20]/30 backdrop-blur-sm focus:bg-[#1A1C20]/50 focus:border-[#697565]/50 transition-all duration-200"
               />
               {input.trim() && !isLoading && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">

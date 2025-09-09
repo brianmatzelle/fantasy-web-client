@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  /* Color Hunt Palette: https://colorhunt.co/palette/1e201e3c3d37697565ecdfcc */
-  --background: #1E201E;
-  --background-secondary: #3C3D37;
+  /* Darker Gray Palette for better contrast */
+  --background: #0F1014;
+  --background-secondary: #1A1C20;
   --accent: #697565;
   --foreground: #ECDFCC;
   --foreground-muted: #C4B8A8;
-  --border: #3C3D37;
-  --input: #3C3D37;
+  --border: #1A1C20;
+  --input: #1A1C20;
   --primary: #697565;
   --primary-foreground: #ECDFCC;
-  --secondary: #3C3D37;
+  --secondary: #1A1C20;
   --secondary-foreground: #ECDFCC;
-  --muted: #1E201E;
+  --muted: #0F1014;
   --muted-foreground: #C4B8A8;
-  --card: #3C3D37;
+  --card: #1A1C20;
   --card-foreground: #ECDFCC;
 }
 
@@ -47,11 +47,11 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1E201E;
+  background: #0F1014;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3C3D37;
+  background: #1A1C20;
   border-radius: 3px;
 }
 
