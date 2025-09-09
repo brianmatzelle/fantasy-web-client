@@ -9,6 +9,9 @@ This Next.js application provides a web interface for interacting with your Fant
 Create a `.env.local` file in the web directory:
 
 ```bash
+# Anthropic API Key for Claude Code SDK
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
 # MCP Server URLs
 NEXT_PUBLIC_ESPN_MCP_URL=http://localhost:8000
 NEXT_PUBLIC_SLEEPER_MCP_URL=http://localhost:8001
@@ -38,6 +41,12 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Features
 
+### 🤖 AI Assistant (NEW!)
+- **Conversational Interface**: Chat with Claude about your fantasy team
+- **Tool Integration**: AI automatically uses MCP tools to get real data
+- **Smart Recommendations**: Get lineup advice, trade suggestions, and strategy tips
+- **Context Awareness**: Maintains conversation history for better assistance
+
 ### 🏈 ESPN Fantasy Football
 - Get roster information
 - View matchups and league teams
@@ -52,6 +61,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - Draft management
 
 ### 🔧 Developer Features
+- **Claude Code SDK**: Powered by Anthropic's latest AI technology
 - **Stateless HTTP**: Each request is independent
 - **Real-time tool execution**: Call MCP tools directly from the UI
 - **Error handling**: Clear error messages and recovery

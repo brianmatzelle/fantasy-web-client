@@ -3,6 +3,7 @@
 import { useESPNFantasy, useSleeperFantasy } from '@/hooks/use-mcp';
 import { useEffect, useState } from 'react';
 import type { MCPTool, MCPToolResult } from '@/lib/mcp-client';
+import ChatBot from './ChatBot';
 
 interface ServerSectionProps {
   title: string;
@@ -104,7 +105,7 @@ function ServerSection({ title, tools, loading, error, onLoadTools, onCallTool, 
 export default function FantasyDashboard() {
   const espnMCP = useESPNFantasy();
   const sleeperMCP = useSleeperFantasy();
-  const [activeTab, setActiveTab] = useState<'espn' | 'sleeper'>('espn');
+  const [activeTab, setActiveTab] = useState<'espn' | 'sleeper' | 'chat'>('chat');
 
   useEffect(() => {
     // Auto-load tools when component mounts
@@ -129,6 +130,16 @@ export default function FantasyDashboard() {
         <div className="flex justify-center mb-8">
           <div className="bg-white rounded-lg p-1 shadow-sm">
             <button
+              onClick={() => setActiveTab('chat')}
+              className={`px-6 py-2 rounded-md font-medium transition-colors ${
+                activeTab === 'chat'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              AI Assistant
+            </button>
+            <button
               onClick={() => setActiveTab('espn')}
               className={`px-6 py-2 rounded-md font-medium transition-colors ${
                 activeTab === 'espn'
@@ -136,7 +147,7 @@ export default function FantasyDashboard() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              ESPN Fantasy
+              ESPN Tools
             </button>
             <button
               onClick={() => setActiveTab('sleeper')}
@@ -146,7 +157,7 @@ export default function FantasyDashboard() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Sleeper Fantasy
+              Sleeper Tools
             </button>
           </div>
         </div>
@@ -179,6 +190,14 @@ export default function FantasyDashboard() {
 
         {/* Main Content */}
         <div className="space-y-8">
+          {activeTab === 'chat' && (
+            <div className="bg-white rounded-lg shadow-md p-6 h-96">
+              <ChatBot 
+                className="h-full"
+              />
+            </div>
+          )}
+          
           {activeTab === 'espn' && (
             <ServerSection
               title="ESPN Fantasy Football"
