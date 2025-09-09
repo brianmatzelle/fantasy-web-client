@@ -27,7 +27,7 @@ export default function ChatBot({
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
   const [error, setError] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -94,7 +94,7 @@ export default function ChatBot({
         },
         body: JSON.stringify({
           message: userMessage,
-          sessionId: sessionId
+          conversationHistory: conversationHistory
         }),
         signal: abortControllerRef.current.signal
       });
@@ -102,9 +102,9 @@ export default function ChatBot({
       const data = await response.json();
 
       if (response.ok) {
-        // Update session ID if provided
-        if (data.sessionId) {
-          setSessionId(data.sessionId);
+        // Update conversation history if provided
+        if (data.conversationHistory) {
+          setConversationHistory(data.conversationHistory);
         }
 
         // Update the assistant message with the response
@@ -119,11 +119,6 @@ export default function ChatBot({
             type: 'system',
             content: `🔧 Used tools: ${data.toolCalls.join(', ')}`
           });
-        }
-
-        // Show metadata if available
-        if (data.metadata) {
-          console.log('Chat metadata:', data.metadata);
         }
 
         // Handle errors
@@ -173,7 +168,7 @@ export default function ChatBot({
       content: 'Chat cleared. How can I help you with your fantasy football team?',
       timestamp: new Date()
     }]);
-    setSessionId(null);
+    setConversationHistory([]);
     setError(null);
   };
 

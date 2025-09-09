@@ -1,10 +1,137 @@
-import { query } from '@anthropic-ai/claude-code';
+import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
+import { createMCPClient } from '@/lib/mcp-client';
+
+// Initialize Anthropic client
+function createAnthropicClient() {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error('Anthropic API key not configured');
+  }
+  return new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+  });
+}
+
+// Define available MCP tools for fantasy football
+const AVAILABLE_TOOLS: Anthropic.Tool[] = [
+  {
+    name: "get_roster",
+    description: "Get the current roster for your fantasy team",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        team_id: { type: "number", description: "Team ID (optional, defaults to your team)" }
+      }
+    }
+  },
+  {
+    name: "get_matchups", 
+    description: "Get fantasy matchups with live scores",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        week: { type: "number", description: "NFL week number (optional)" }
+      }
+    }
+  },
+  {
+    name: "get_league_teams",
+    description: "Get all teams in your fantasy league with standings",
+    input_schema: { type: "object" as const, properties: {} }
+  },
+  {
+    name: "get_free_agents",
+    description: "Get available free agents by position",
+    input_schema: {
+      type: "object" as const, 
+      properties: {
+        position: { type: "string", description: "Position filter (QB, RB, WR, TE, K, D/ST)" },
+        size: { type: "number", description: "Number of players to return (default 50)" }
+      }
+    }
+  },
+  {
+    name: "get_player_stats",
+    description: "Get detailed statistics for a specific player",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        player_id: { type: "number", description: "ESPN player ID" },
+        weeks: { type: "array", items: { type: "number" }, description: "Specific weeks to analyze" }
+      },
+      required: ["player_id"]
+    }
+  },
+  {
+    name: "get_live_player_stats",
+    description: "Get live player stats for current week",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        week: { type: "number", description: "NFL week number" },
+        team_id: { type: "number", description: "Team ID to filter by" }
+      }
+    }
+  },
+  {
+    name: "get_power_rankings",
+    description: "Get team power rankings based on strength analysis",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        week: { type: "number", description: "Week to calculate rankings for" }
+      }
+    }
+  },
+  {
+    name: "get_positional_rankings",
+    description: "Get matchup rankings showing defense strength against positions",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        week: { type: "number", description: "NFL week number" }
+      }
+    }
+  },
+  {
+    name: "get_recent_transactions",
+    description: "Get recent league transactions and activity",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        size: { type: "number", description: "Number of transactions to return" },
+        activity_type: { type: "string", description: "Filter by activity type (FA, WAIVER, TRADED)" }
+      }
+    }
+  },
+  {
+    name: "change_lineup",
+    description: "Move players between roster positions",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              playerId: { type: "number", description: "ESPN player ID" },
+              fromLineupSlotId: { type: "number", description: "Current position slot ID" },
+              toLineupSlotId: { type: "number", description: "New position slot ID" }
+            },
+            required: ["playerId", "fromLineupSlotId", "toLineupSlotId"]
+          }
+        }
+      },
+      required: ["items"]
+    }
+  }
+];
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, sessionId } = body;
+    const { message, conversationHistory = [] } = body;
 
     if (!message) {
       return NextResponse.json(
@@ -13,34 +140,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for Anthropic API key
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json(
-        { error: 'Anthropic API key not configured' },
-        { status: 500 }
-      );
-    }
+    const anthropic = createAnthropicClient();
+    const mcpClient = createMCPClient('espn');
 
-    const abortController = new AbortController();
-    
-    // Set up a timeout to prevent hanging requests
-    const timeout = setTimeout(() => {
-      abortController.abort();
-    }, 60000); // 60 second timeout
+    // Build conversation messages
+    const messages: Anthropic.Messages.MessageParam[] = [
+      ...conversationHistory,
+      {
+        role: 'user',
+        content: message
+      }
+    ];
 
-    try {
-      let fullResponse = '';
-      let currentSessionId = sessionId;
-      const toolCalls: string[] = [];
+    const systemPrompt = `You are an expert fantasy football assistant with access to ESPN Fantasy Football data through MCP tools.
 
-      // Use Claude Code SDK with MCP server configuration
-      for await (const response of query({
-        prompt: message,
-        options: {
-          abortController,
-          maxTurns: 5,
-          customSystemPrompt: `You are an expert fantasy football assistant with access to ESPN Fantasy Football data through MCP tools. 
-          
 Help users with:
 - Roster management and lineup optimization
 - Player analysis and recommendations  
@@ -50,128 +163,110 @@ Help users with:
 - League standings and power rankings
 - Player news and injury updates
 
-Always use the available MCP tools to get real-time data when answering questions. Be conversational, helpful, and provide actionable fantasy football advice.`,
-          
-          // Configure the remote MCP server using URL
-          mcpServers: {
-            "espn-fantasy": {
-              type: "http",
-              url: "https://api.poop.football/mcp"
-            }
-          },
-          
-          // Continue conversation if we have a session
-          ...(currentSessionId ? { resume: currentSessionId } : {}),
-          
-          // Allow ESPN fantasy tools (using actual tool names from the server)
-          allowedTools: [
-            "Read", "Grep", "WebSearch",
-            "mcp__espn-fantasy__change_lineup",
-            "mcp__espn-fantasy__get_lineup_slot_reference",
-            "mcp__espn-fantasy__get_roster",
-            "mcp__espn-fantasy__get_free_agents",
-            "mcp__espn-fantasy__get_player_stats",
-            "mcp__espn-fantasy__get_live_player_stats",
-            "mcp__espn-fantasy__get_league_teams",
-            "mcp__espn-fantasy__get_matchups",
-            "mcp__espn-fantasy__get_live_matchups",
-            "mcp__espn-fantasy__get_power_rankings",
-            "mcp__espn-fantasy__get_recent_transactions",
-            "mcp__espn-fantasy__get_positional_rankings",
-            "mcp__espn-fantasy__get_server_config",
-            "mcp__espn-fantasy__claim_waiver_player",
-            "mcp__espn-fantasy__pickup_free_agent",
-            "mcp__espn-fantasy__drop_roster_player",
-            "mcp__espn-fantasy__propose_trade_offer",
-            "mcp__espn-fantasy__accept_trade_proposal",
-            "mcp__espn-fantasy__decline_trade_proposal",
-            "mcp__espn-fantasy__cancel_trade_proposal",
-            "mcp__espn-fantasy__get_pending_trades",
-            "mcp__espn-fantasy__move_player_to_ir",
-            "mcp__espn-fantasy__move_player_from_ir",
-            "mcp__espn-fantasy__get_ir_eligible_players",
-            "mcp__espn-fantasy__get_player_news",
-            "mcp__espn-fantasy__get_nfl_news",
-            "mcp__espn-fantasy__get_fantasy_news",
-            "mcp__espn-fantasy__get_draft_recap",
-            "mcp__espn-fantasy__get_draft_results",
-            "mcp__espn-fantasy__draft_strategy_analysis",
-            "mcp__espn-fantasy__get_league_messages",
-            "mcp__espn-fantasy__get_historical_standings",
-            "mcp__espn-fantasy__get_season_records",
-            "mcp__espn-fantasy__get_weekly_roster_analysis"
-          ]
-        }
-      })) {
-        
-        // Handle different message types
-        if (response.type === 'system' && response.subtype === 'init') {
-          currentSessionId = response.session_id;
-        }
-        
-        if (response.type === 'assistant') {
-          const content = response.message.content;
-          if (Array.isArray(content)) {
-            // Look for tool use blocks to track what tools were called
-            content.forEach(block => {
-              if (block.type === 'tool_use') {
-                toolCalls.push(`${block.name}(${JSON.stringify(block.input)})`);
-              }
-            });
-            
-            const textContent = content
-              .filter(c => c.type === 'text')
-              .map(c => c.text)
-              .join('');
-            
-            fullResponse += textContent;
-          }
-        }
-        
-        if (response.type === 'result') {
-          // Final result
-          clearTimeout(timeout);
-          
-          const isSuccess = response.subtype === 'success';
-          
-          return NextResponse.json({
-            response: isSuccess ? (response as { result: string }).result : fullResponse,
-            sessionId: currentSessionId,
-            toolCalls,
-            success: isSuccess,
-            error: response.subtype?.startsWith('error') ? 
-              `Conversation ${response.subtype.replace('error_', '')}` : null,
-            metadata: {
-              duration_ms: response.duration_ms,
-              num_turns: response.num_turns,
-              total_cost_usd: response.total_cost_usd
-            }
-          });
-        }
-      }
+Always use the available MCP tools to get real-time data when answering questions. Be conversational, helpful, and provide actionable fantasy football advice.
 
-      // If we get here without a result, something went wrong
-      clearTimeout(timeout);
-      return NextResponse.json({
-        response: fullResponse || 'No response generated',
-        sessionId: currentSessionId,
-        toolCalls,
-        success: false,
-        error: 'Incomplete response'
+When using tools, make sure to interpret the results and provide helpful analysis rather than just showing raw data.`;
+
+    const toolCalls: string[] = [];
+    let response = '';
+
+    try {
+      // Make initial request to Claude
+      const result = await anthropic.messages.create({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages,
+        tools: AVAILABLE_TOOLS,
+        tool_choice: { type: 'auto' }
       });
 
-    } catch (queryError) {
-      clearTimeout(timeout);
-      
-      if (queryError instanceof Error && queryError.name === 'AbortError') {
-        return NextResponse.json(
-          { error: 'Request timed out' },
-          { status: 408 }
-        );
+      const currentMessages = [...messages];
+      let currentResult = result;
+
+      // Handle tool calls in a loop (up to 5 iterations to prevent infinite loops)
+      for (let iteration = 0; iteration < 5; iteration++) {
+        if (currentResult.content.some(block => block.type === 'tool_use')) {
+          // Execute tool calls
+          const toolResults = [];
+          
+          for (const block of currentResult.content) {
+            if (block.type === 'tool_use') {
+              toolCalls.push(`${block.name}(${JSON.stringify(block.input)})`);
+              
+              try {
+                console.log(`Calling MCP tool: ${block.name} with args:`, block.input);
+                const toolArgs = block.input as Record<string, unknown>;
+                const toolResult = await mcpClient.callTool(block.name, toolArgs);
+                
+                toolResults.push({
+                  type: 'tool_result' as const,
+                  tool_use_id: block.id,
+                  content: toolResult.isError ? 
+                    `Error: ${toolResult.content}` : 
+                    JSON.stringify(toolResult.content, null, 2)
+                });
+              } catch (error) {
+                console.error(`Error calling tool ${block.name}:`, error);
+                toolResults.push({
+                  type: 'tool_result' as const,
+                  tool_use_id: block.id,
+                  content: `Error calling ${block.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
+                });
+              }
+            }
+          }
+
+          // Add assistant message and tool results to conversation
+          currentMessages.push({
+            role: 'assistant',
+            content: currentResult.content
+          });
+
+          if (toolResults.length > 0) {
+            currentMessages.push({
+              role: 'user',
+              content: toolResults
+            });
+
+            // Continue conversation with tool results
+            currentResult = await anthropic.messages.create({
+              model: 'claude-3-5-sonnet-20241022',
+              max_tokens: 4000,
+              system: systemPrompt,
+              messages: currentMessages,
+              tools: AVAILABLE_TOOLS,
+              tool_choice: { type: 'auto' }
+            });
+          } else {
+            break;
+          }
+        } else {
+          // No more tool calls, we're done
+          break;
+        }
       }
-      
-      throw queryError;
+
+      // Extract final response text
+      response = currentResult.content
+        .filter(block => block.type === 'text')
+        .map(block => block.text)
+        .join('\n');
+
+    } finally {
+      await mcpClient.close();
     }
+
+    return NextResponse.json({
+      response,
+      toolCalls,
+      success: true,
+      conversationHistory: [
+        ...conversationHistory,
+        { role: 'user', content: message },
+        { role: 'assistant', content: response }
+      ]
+    });
 
   } catch (error) {
     console.error('Chat API error:', error);
