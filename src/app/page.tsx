@@ -1,5 +1,5 @@
-import FantasyDashboard from '@/components/FantasyDashboard';
+import ChatInterface from '@/components/ChatInterface';
 
 export default function Home() {
-  return <FantasyDashboard />;
+  return <ChatInterface />;
 }

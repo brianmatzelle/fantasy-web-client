@@ -2,12 +2,8 @@
 export const MCP_CONFIG = {
   servers: {
     espn: {
-      url: process.env.NEXT_PUBLIC_ESPN_MCP_URL || 'http://localhost:8000',
+      url: process.env.NEXT_PUBLIC_ESPN_MCP_URL || 'https://api.poop.football',
       name: 'ESPN Fantasy Football'
-    },
-    sleeper: {
-      url: process.env.NEXT_PUBLIC_SLEEPER_MCP_URL || 'http://localhost:8001',
-      name: 'Sleeper Fantasy Football'
     }
   },
   endpoints: {

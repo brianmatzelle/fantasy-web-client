@@ -8,15 +8,15 @@ export async function POST(
   const { server, action } = await params;
 
   // Validate server parameter
-  if (server !== 'espn' && server !== 'sleeper') {
+  if (server !== 'espn') {
     return NextResponse.json(
-      { error: `Invalid server: ${server}. Must be 'espn' or 'sleeper'` },
+      { error: `Invalid server: ${server}. Must be 'espn'` },
       { status: 400 }
     );
   }
 
   try {
-    const client = createMCPClient(server as 'espn' | 'sleeper');
+    const client = createMCPClient(server as 'espn');
     let result;
 
     switch (action) {

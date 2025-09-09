@@ -12,7 +12,7 @@ interface UseMCPReturn {
   clearError: () => void;
 }
 
-export function useMCP(server: 'espn' | 'sleeper'): UseMCPReturn {
+export function useMCP(server: 'espn'): UseMCPReturn {
   const [tools, setTools] = useState<MCPTool[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,26 +123,3 @@ export function useESPNFantasy() {
   };
 }
 
-// Specialized hook for Sleeper operations
-export function useSleeperFantasy() {
-  const mcp = useMCP('sleeper');
-  
-  const getUser = useCallback(async (username: string) => {
-    return await mcp.callTool('get_user', { username });
-  }, [mcp]);
-
-  const getUserLeagues = useCallback(async (userId: string, season: string) => {
-    return await mcp.callTool('get_user_leagues', { user_id: userId, season });
-  }, [mcp]);
-
-  const getAllPlayers = useCallback(async () => {
-    return await mcp.callTool('get_all_players');
-  }, [mcp]);
-
-  return {
-    ...mcp,
-    getUser,
-    getUserLeagues,
-    getAllPlayers,
-  };
-}

@@ -21,7 +21,7 @@ export class MCPHTTPClient {
     this.transport = new StreamableHTTPClientTransport(new URL(baseUrl));
     this.client = new Client({
       name: "fantasy-web-client",
-      version: "1.0.0",
+      version: "1.0.1",
     }, {
       capabilities: {
         tools: {},
@@ -75,10 +75,9 @@ export class MCPHTTPClient {
 }
 
 // Factory function to create clients for different servers
-export function createMCPClient(server: 'espn' | 'sleeper'): MCPHTTPClient {
+export function createMCPClient(server: 'espn'): MCPHTTPClient {
   const baseUrls = {
-    espn: process.env.NEXT_PUBLIC_ESPN_MCP_URL || 'http://localhost:8000',
-    sleeper: process.env.NEXT_PUBLIC_SLEEPER_MCP_URL || 'http://localhost:8001'
+    espn: process.env.NEXT_PUBLIC_ESPN_MCP_URL || 'https://api.poop.football'
   };
   
   return new MCPHTTPClient(`${baseUrls[server]}/mcp`);
