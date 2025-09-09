@@ -142,12 +142,17 @@ export default function ChatInterface() {
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-white">
+    <div className="flex flex-col h-screen bg-[#1E201E]">
       {/* Header */}
-      <div className="border-b border-gray-100 px-4 py-3">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-lg font-semibold text-gray-900">Fantasy Football AI</h1>
-          <p className="text-sm text-gray-500">Your AI-powered fantasy football assistant</p>
+      <div className="border-b border-[#3C3D37]/50 px-6 py-4 bg-[#1E201E]/95 backdrop-blur-sm">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-[#ECDFCC] tracking-tight">Fantasy Football AI</h1>
+            <p className="text-sm text-[#C4B8A8]/80 mt-0.5">Your AI-powered fantasy football assistant</p>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#697565] to-[#697565]/70 flex items-center justify-center">
+            <span className="text-[#ECDFCC] text-sm font-medium">⚡</span>
+          </div>
         </div>
       </div>
 
@@ -155,62 +160,60 @@ export default function ChatInterface() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 py-8">
           {messages.length === 0 ? (
-            <div className="text-center space-y-6">
-              <div className="space-y-2">
-                <h2 className="text-2xl font-semibold text-gray-900">
+            <div className="text-center space-y-8 py-12">
+              <div className="space-y-4">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-[#697565] to-[#697565]/70 flex items-center justify-center shadow-lg">
+                  <span className="text-2xl">🏈</span>
+                </div>
+                <h2 className="text-3xl font-bold text-[#ECDFCC] tracking-tight">
                   Welcome to Fantasy Football AI
                 </h2>
-                <p className="text-gray-600 max-w-md mx-auto">
-                  I can help you manage your ESPN Fantasy Football team. Ask me about your roster, matchups, free agents, or any other fantasy football questions!
+                <p className="text-[#C4B8A8]/90 max-w-lg mx-auto text-lg leading-relaxed">
+                  Your intelligent assistant for managing your ESPN Fantasy Football team. Get insights on roster decisions, matchups, and player analysis.
                 </p>
-              </div>
-              
-              {/* Quick Start Prompts */}
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-700">Try asking:</p>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {quickPrompts.map((prompt) => (
-                    <Button
-                      key={prompt}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setInput(prompt)}
-                      disabled={isLoading}
-                      className="text-xs"
-                    >
-                      {prompt}
-                    </Button>
-                  ))}
-                </div>
               </div>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-8">
               {messages.map((message) => (
                 <div
                   key={message.id}
                   className={cn(
-                    "flex w-full",
+                    "flex w-full gap-3",
                     message.type === 'user' ? "justify-end" : "justify-start"
                   )}
                 >
-                  <Card className={cn(
-                    "max-w-[80%] border-0 shadow-sm",
+                  {message.type === 'assistant' && (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#697565] to-[#697565]/70 flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <span className="text-[#ECDFCC] text-sm font-medium">🤖</span>
+                    </div>
+                  )}
+                  <div className={cn(
+                    "max-w-[75%] rounded-2xl px-4 py-3 shadow-sm",
                     message.type === 'user' 
-                      ? "bg-gray-900 text-white" 
-                      : "bg-gray-50"
+                      ? "bg-[#697565] text-[#ECDFCC] rounded-br-md" 
+                      : "bg-[#3C3D37] text-[#ECDFCC] rounded-bl-md border border-[#3C3D37]/50"
                   )}>
-                    <div className="p-4">
-                      <div className="prose prose-sm max-w-none">
-                        <div className="whitespace-pre-wrap text-sm">
-                          {message.content || (message.isStreaming ? 'Thinking...' : '')}
-                          {message.isStreaming && (
-                            <span className="inline-block w-2 h-4 ml-1 bg-gray-400 animate-pulse rounded"></span>
-                          )}
-                        </div>
+                    <div className="prose prose-sm max-w-none">
+                      <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                        {message.content || (message.isStreaming ? (
+                          <div className="flex items-center gap-2">
+                            <span>Thinking</span>
+                            <div className="flex gap-1">
+                              <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce"></div>
+                              <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                              <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            </div>
+                          </div>
+                        ) : '')}
                       </div>
                     </div>
-                  </Card>
+                  </div>
+                  {message.type === 'user' && (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#ECDFCC] to-[#C4B8A8] flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <span className="text-[#1E201E] text-sm font-medium">👤</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -220,42 +223,64 @@ export default function ChatInterface() {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-gray-100 bg-white">
-        <div className="max-w-4xl mx-auto p-4">
+      <div className="border-t border-[#3C3D37]/50 bg-[#1E201E] shadow-lg">
+        <div className="max-w-4xl mx-auto p-6">
+          {/* Quick Start Prompts - moved here above input */}
+          {messages.length === 0 && (
+            <div className="mb-6 space-y-4">
+              <p className="text-sm font-medium text-[#C4B8A8]/80 text-center">Get started with these questions:</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {quickPrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => setInput(prompt)}
+                    disabled={isLoading}
+                    className="group p-3 text-left rounded-xl bg-[#3C3D37]/50 hover:bg-[#3C3D37] border border-[#3C3D37]/30 hover:border-[#697565]/30 transition-all duration-200 hover:shadow-md"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-[#697565] group-hover:bg-[#697565] transition-colors"></div>
+                      <span className="text-sm text-[#ECDFCC] group-hover:text-[#ECDFCC] font-medium">{prompt}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit} className="flex gap-3">
-            <div className="flex-1">
+            <div className="flex-1 relative">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about your fantasy team..."
+                placeholder="Message Fantasy Football AI..."
                 disabled={isLoading}
-                className="w-full h-12 text-base border-gray-200 focus-visible:ring-gray-900"
+                className="w-full h-14 text-base pl-4 pr-12 rounded-2xl border-[#3C3D37]/50 bg-[#3C3D37]/30 backdrop-blur-sm focus:bg-[#3C3D37]/50 focus:border-[#697565]/50 transition-all duration-200"
               />
-            </div>
-            <div className="flex gap-2">
-              {isLoading && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  onClick={handleStop}
-                  className="h-12 px-4"
-                >
-                  Stop
-                </Button>
+              {input.trim() && !isLoading && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <button
+                    type="submit"
+                    className="w-8 h-8 rounded-full bg-[#697565] hover:bg-[#697565]/90 flex items-center justify-center transition-colors duration-200 shadow-sm"
+                  >
+                    <span className="text-[#ECDFCC] text-sm">↑</span>
+                  </button>
+                </div>
               )}
-              <Button
-                type="submit"
-                disabled={isLoading || !input.trim()}
-                className="h-12 px-6"
-              >
-                {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  'Send'
-                )}
-              </Button>
             </div>
+            {isLoading && (
+              <Button
+                type="button"
+                variant="outline"
+                size="default"
+                onClick={handleStop}
+                className="h-14 px-6 rounded-2xl"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-[#ECDFCC] border-t-transparent rounded-full animate-spin"></div>
+                  <span>Stop</span>
+                </div>
+              </Button>
+            )}
           </form>
         </div>
       </div>

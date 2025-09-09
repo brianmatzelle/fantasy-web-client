@@ -173,7 +173,7 @@ When using tools, make sure to interpret the results and provide helpful analysi
     try {
       // Make initial request to Claude
       const result = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,
         system: systemPrompt,
         messages,
@@ -231,7 +231,7 @@ When using tools, make sure to interpret the results and provide helpful analysi
 
             // Continue conversation with tool results
             currentResult = await anthropic.messages.create({
-              model: 'claude-3-5-sonnet-20241022',
+              model: 'claude-sonnet-4-20250514',
               max_tokens: 4000,
               system: systemPrompt,
               messages: currentMessages,
