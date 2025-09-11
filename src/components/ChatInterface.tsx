@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 
 interface Message {
   id: string;
@@ -194,20 +195,24 @@ export default function ChatInterface() {
                       ? "bg-[#697565] text-[#ECDFCC] rounded-br-md" 
                       : "bg-[#1A1C20] text-[#ECDFCC] rounded-bl-md border border-[#1A1C20]/50"
                   )}>
-                    <div className="prose prose-sm max-w-none">
-                      <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                        {message.content || (message.isStreaming ? (
-                          <div className="flex items-center gap-2">
-                            <span>Thinking</span>
-                            <div className="flex gap-1">
-                              <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce"></div>
-                              <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                              <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                            </div>
+                    {message.type === 'assistant' ? (
+                      message.content ? (
+                        <MarkdownRenderer content={message.content} />
+                      ) : message.isStreaming ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-[#ECDFCC]">Thinking</span>
+                          <div className="flex gap-1">
+                            <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce"></div>
+                            <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                           </div>
-                        ) : '')}
+                        </div>
+                      ) : null
+                    ) : (
+                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-[#ECDFCC]">
+                        {message.content}
                       </div>
-                    </div>
+                    )}
                   </div>
                   {message.type === 'user' && (
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#ECDFCC] to-[#C4B8A8] flex items-center justify-center flex-shrink-0 shadow-sm">
