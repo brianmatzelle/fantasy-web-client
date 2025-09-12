@@ -12,121 +12,50 @@ function createAnthropicClient() {
   });
 }
 
-// Define available MCP tools for fantasy football
-const AVAILABLE_TOOLS: Anthropic.Tool[] = [
-  {
-    name: "get_roster",
-    description: "Get the current roster for your fantasy team",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        team_id: { type: "number", description: "Team ID (optional, defaults to your team)" }
-      }
-    }
-  },
-  {
-    name: "get_matchups", 
-    description: "Get fantasy matchups with live scores",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        week: { type: "number", description: "NFL week number (optional)" }
-      }
-    }
-  },
-  {
-    name: "get_league_teams",
-    description: "Get all teams in your fantasy league with standings",
-    input_schema: { type: "object" as const, properties: {} }
-  },
-  {
-    name: "get_free_agents",
-    description: "Get available free agents by position",
-    input_schema: {
-      type: "object" as const, 
-      properties: {
-        position: { type: "string", description: "Position filter (QB, RB, WR, TE, K, D/ST)" },
-        size: { type: "number", description: "Number of players to return (default 50)" }
-      }
-    }
-  },
-  {
-    name: "get_player_stats",
-    description: "Get detailed statistics for a specific player",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        player_id: { type: "number", description: "ESPN player ID" },
-        weeks: { type: "array", items: { type: "number" }, description: "Specific weeks to analyze" }
-      },
-      required: ["player_id"]
-    }
-  },
-  {
-    name: "get_live_player_stats",
-    description: "Get live player stats for current week",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        week: { type: "number", description: "NFL week number" },
-        team_id: { type: "number", description: "Team ID to filter by" }
-      }
-    }
-  },
-  {
-    name: "get_power_rankings",
-    description: "Get team power rankings based on strength analysis",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        week: { type: "number", description: "Week to calculate rankings for" }
-      }
-    }
-  },
-  {
-    name: "get_positional_rankings",
-    description: "Get matchup rankings showing defense strength against positions",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        week: { type: "number", description: "NFL week number" }
-      }
-    }
-  },
-  {
-    name: "get_recent_transactions",
-    description: "Get recent league transactions and activity",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        size: { type: "number", description: "Number of transactions to return" },
-        activity_type: { type: "string", description: "Filter by activity type (FA, WAIVER, TRADED)" }
-      }
-    }
-  },
-  {
-    name: "change_lineup",
-    description: "Move players between roster positions",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        items: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              playerId: { type: "number", description: "ESPN player ID" },
-              fromLineupSlotId: { type: "number", description: "Current position slot ID" },
-              toLineupSlotId: { type: "number", description: "New position slot ID" }
-            },
-            required: ["playerId", "fromLineupSlotId", "toLineupSlotId"]
+// Function to dynamically fetch available tools from MCP server
+async function getAvailableTools(mcpClient: ReturnType<typeof createMCPClient>): Promise<Anthropic.Tool[]> {
+  try {
+    const mcpTools = await mcpClient.listTools();
+    
+    // Convert MCP tools to Anthropic tool format
+    return mcpTools.map(tool => ({
+      name: tool.name,
+      description: tool.description || `Execute ${tool.name} tool`,
+      input_schema: tool.inputSchema as Anthropic.Tool.InputSchema
+    }));
+  } catch (error) {
+    console.error('Error fetching tools from MCP server:', error);
+    
+    // Fallback to basic tools if MCP server is unavailable
+    return [
+      {
+        name: "get_roster",
+        description: "Get the current roster for your fantasy team",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            team_id: { type: "number", description: "Team ID (optional, defaults to your team)" }
           }
         }
       },
-      required: ["items"]
-    }
+      {
+        name: "get_matchups", 
+        description: "Get fantasy matchups with live scores",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            week: { type: "number", description: "NFL week number (optional)" }
+          }
+        }
+      },
+      {
+        name: "get_league_teams",
+        description: "Get all teams in your fantasy league with standings",
+        input_schema: { type: "object" as const, properties: {} }
+      }
+    ];
   }
-];
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -142,6 +71,9 @@ export async function POST(request: NextRequest) {
 
     const anthropic = createAnthropicClient();
     const mcpClient = createMCPClient('espn');
+    
+    // Fetch available tools dynamically from MCP server
+    const availableTools = await getAvailableTools(mcpClient);
 
     // Build conversation messages
     const messages: Anthropic.Messages.MessageParam[] = [
@@ -177,7 +109,7 @@ When using tools, make sure to interpret the results and provide helpful analysi
         max_tokens: 4000,
         system: systemPrompt,
         messages,
-        tools: AVAILABLE_TOOLS,
+        tools: availableTools,
         tool_choice: { type: 'auto' }
       });
 
@@ -235,7 +167,7 @@ When using tools, make sure to interpret the results and provide helpful analysi
               max_tokens: 4000,
               system: systemPrompt,
               messages: currentMessages,
-              tools: AVAILABLE_TOOLS,
+              tools: availableTools,
               tool_choice: { type: 'auto' }
             });
           } else {
