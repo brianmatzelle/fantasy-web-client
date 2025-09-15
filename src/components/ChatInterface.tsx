@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
+import UserMenu from '@/components/UserMenu';
 
 interface Message {
   id: string;
@@ -16,6 +18,7 @@ interface Message {
 }
 
 export default function ChatInterface() {
+  const { data: session, status } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -149,11 +152,16 @@ export default function ChatInterface() {
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-[#ECDFCC] tracking-tight">Fantasy Football AI</h1>
-            <p className="text-sm text-[#C4B8A8]/80 mt-0.5">Your AI-powered fantasy football assistant</p>
+            <p className="text-sm text-[#C4B8A8]/80 mt-0.5">
+              Your AI-powered fantasy football assistant
+              {session?.user && (
+                <span className="ml-2 text-[#697565]">
+                  • Welcome, {session.user.name?.split(' ')[0]}!
+                </span>
+              )}
+            </p>
           </div>
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#697565] to-[#697565]/70 flex items-center justify-center">
-            <span className="text-[#ECDFCC] text-sm font-medium">⚡</span>
-          </div>
+          <UserMenu />
         </div>
       </div>
 
