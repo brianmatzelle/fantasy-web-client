@@ -32,3 +32,4 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
     </div>
   );
 }
+
