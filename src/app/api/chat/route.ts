@@ -99,105 +99,180 @@ Always use the available MCP tools to get real-time data when answering question
 
 When using tools, make sure to interpret the results and provide helpful analysis rather than just showing raw data.`;
 
-    const toolCalls: string[] = [];
-    let response = '';
+    // Create a ReadableStream for streaming response
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        
+        const sendEvent = (type: string, data: Record<string, unknown>) => {
+          const eventData = `data: ${JSON.stringify({ type, data })}\n\n`;
+          controller.enqueue(encoder.encode(eventData));
+        };
 
-    try {
-      // Make initial request to Claude
-      const result = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        system: systemPrompt,
-        messages,
-        tools: availableTools,
-        tool_choice: { type: 'auto' }
-      });
-
-      const currentMessages = [...messages];
-      let currentResult = result;
-
-      // Handle tool calls in a loop (up to 5 iterations to prevent infinite loops)
-      for (let iteration = 0; iteration < 5; iteration++) {
-        if (currentResult.content.some(block => block.type === 'tool_use')) {
-          // Execute tool calls
-          const toolResults = [];
+        try {
+          let conversationMessages = [...messages];
           
-          for (const block of currentResult.content) {
-            if (block.type === 'tool_use') {
-              toolCalls.push(`${block.name}(${JSON.stringify(block.input)})`);
-              
-              try {
-                console.log(`Calling MCP tool: ${block.name} with args:`, block.input);
-                const toolArgs = block.input as Record<string, unknown>;
-                const toolResult = await mcpClient.callTool(block.name, toolArgs);
-                
-                toolResults.push({
-                  type: 'tool_result' as const,
-                  tool_use_id: block.id,
-                  content: toolResult.isError ? 
-                    `Error: ${toolResult.content}` : 
-                    JSON.stringify(toolResult.content, null, 2)
-                });
-              } catch (error) {
-                console.error(`Error calling tool ${block.name}:`, error);
-                toolResults.push({
-                  type: 'tool_result' as const,
-                  tool_use_id: block.id,
-                  content: `Error calling ${block.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
-                });
-              }
-            }
-          }
-
-          // Add assistant message and tool results to conversation
-          currentMessages.push({
-            role: 'assistant',
-            content: currentResult.content
-          });
-
-          if (toolResults.length > 0) {
-            currentMessages.push({
-              role: 'user',
-              content: toolResults
-            });
-
-            // Continue conversation with tool results
-            currentResult = await anthropic.messages.create({
+          // Handle tool calls in a loop (up to 10 iterations to prevent infinite loops)
+          for (let iteration = 0; iteration < 10; iteration++) {
+            // Make streaming request to Claude
+            const stream = await anthropic.messages.create({
               model: 'claude-sonnet-4-20250514',
               max_tokens: 4000,
               system: systemPrompt,
-              messages: currentMessages,
+              messages: conversationMessages,
               tools: availableTools,
-              tool_choice: { type: 'auto' }
+              tool_choice: { type: 'auto' },
+              stream: true
             });
-          } else {
-            break;
+
+            let hasToolUse = false;
+            let currentContent: any[] = [];
+            
+            // Process streaming response
+            for await (const messageStreamEvent of stream) {
+              if (messageStreamEvent.type === 'content_block_start') {
+                if (messageStreamEvent.content_block.type === 'text') {
+                  sendEvent('text_start', { 
+                    index: messageStreamEvent.index 
+                  });
+                } else if (messageStreamEvent.content_block.type === 'tool_use') {
+                  hasToolUse = true;
+                  sendEvent('tool_use_start', {
+                    index: messageStreamEvent.index,
+                    tool: {
+                      id: messageStreamEvent.content_block.id,
+                      name: messageStreamEvent.content_block.name,
+                      input: messageStreamEvent.content_block.input
+                    }
+                  });
+                  currentContent.push(messageStreamEvent.content_block);
+                }
+              } else if (messageStreamEvent.type === 'content_block_delta') {
+                if (messageStreamEvent.delta.type === 'text_delta') {
+                  sendEvent('text_delta', {
+                    index: messageStreamEvent.index,
+                    text: messageStreamEvent.delta.text
+                  });
+                } else if (messageStreamEvent.delta.type === 'input_json_delta') {
+                  sendEvent('tool_input_delta', {
+                    index: messageStreamEvent.index,
+                    partial_json: messageStreamEvent.delta.partial_json
+                  });
+                }
+              } else if (messageStreamEvent.type === 'content_block_stop') {
+                if (messageStreamEvent.index < currentContent.length && 
+                    currentContent[messageStreamEvent.index]?.type === 'text') {
+                  sendEvent('text_stop', { index: messageStreamEvent.index });
+                } else {
+                  sendEvent('tool_use_stop', { index: messageStreamEvent.index });
+                }
+              } else if (messageStreamEvent.type === 'message_start') {
+                currentContent = [];
+              } else if (messageStreamEvent.type === 'message_delta') {
+                // Handle message-level updates if needed
+              } else if (messageStreamEvent.type === 'message_stop') {
+                // Message completed
+                break;
+              }
+            }
+
+            // If there were tool uses, execute them
+            if (hasToolUse) {
+              const toolResults = [];
+              
+              for (const block of currentContent) {
+                if (block.type === 'tool_use' && block.id && block.name) {
+                  sendEvent('tool_execution_start', {
+                    tool_name: block.name,
+                    tool_id: block.id
+                  });
+                  
+                  try {
+                    console.log(`Calling MCP tool: ${block.name} with args:`, block.input);
+                    const toolArgs = block.input as Record<string, unknown>;
+                    const toolResult = await mcpClient.callTool(block.name, toolArgs);
+                    
+                    sendEvent('tool_execution_complete', {
+                      tool_name: block.name,
+                      tool_id: block.id,
+                      success: !toolResult.isError
+                    });
+                    
+                    toolResults.push({
+                      type: 'tool_result' as const,
+                      tool_use_id: block.id,
+                      content: toolResult.isError ? 
+                        `Error: ${toolResult.content}` : 
+                        JSON.stringify(toolResult.content, null, 2)
+                    });
+                  } catch (error) {
+                    console.error(`Error calling tool ${block.name}:`, error);
+                    
+                    sendEvent('tool_execution_error', {
+                      tool_name: block.name,
+                      tool_id: block.id,
+                      error: error instanceof Error ? error.message : 'Unknown error'
+                    });
+                    
+                    toolResults.push({
+                      type: 'tool_result' as const,
+                      tool_use_id: block.id,
+                      content: `Error calling ${block.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
+                    });
+                  }
+                }
+              }
+
+              // Add assistant message and tool results to conversation
+              conversationMessages = [
+                ...conversationMessages,
+                {
+                  role: 'assistant',
+                  content: currentContent
+                }
+              ];
+
+              if (toolResults.length > 0) {
+                conversationMessages = [
+                  ...conversationMessages,
+                  {
+                    role: 'user',
+                    content: toolResults
+                  }
+                ];
+                
+                // Continue with next iteration to get the final response
+                continue;
+              } else {
+                break;
+              }
+            } else {
+              // No tool use, we're done
+              break;
+            }
           }
-        } else {
-          // No more tool calls, we're done
-          break;
+
+          sendEvent('complete', {});
+          controller.close();
+
+        } catch (error) {
+          console.error('Streaming error:', error);
+          sendEvent('error', {
+            error: error instanceof Error ? error.message : 'Unknown error occurred'
+          });
+          controller.close();
+        } finally {
+          await mcpClient.close();
         }
       }
+    });
 
-      // Extract final response text
-      response = currentResult.content
-        .filter(block => block.type === 'text')
-        .map(block => block.text)
-        .join('\n');
-
-    } finally {
-      await mcpClient.close();
-    }
-
-    return NextResponse.json({
-      response,
-      toolCalls,
-      success: true,
-      conversationHistory: [
-        ...conversationHistory,
-        { role: 'user', content: message },
-        { role: 'assistant', content: response }
-      ]
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     });
 
   } catch (error) {

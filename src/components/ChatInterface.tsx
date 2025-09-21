@@ -3,9 +3,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
+
+interface ToolCall {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+  status: 'executing' | 'completed' | 'error';
+  error?: string;
+}
 
 interface Message {
   id: string;
@@ -13,6 +20,44 @@ interface Message {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  toolCalls?: ToolCall[];
+}
+
+// Tool Call Component
+function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
+  const getStatusIcon = () => {
+    switch (toolCall.status) {
+      case 'executing':
+        return <div className="w-3 h-3 border border-[#697565] border-t-transparent rounded-full animate-spin"></div>;
+      case 'completed':
+        return <span className="text-green-400">✓</span>;
+      case 'error':
+        return <span className="text-red-400">✗</span>;
+    }
+  };
+
+  const getStatusText = () => {
+    switch (toolCall.status) {
+      case 'executing':
+        return 'Running...';
+      case 'completed':
+        return 'Completed';
+      case 'error':
+        return `Error: ${toolCall.error}`;
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-lg bg-[#1A1C20]/50 border border-[#1A1C20]/30 text-sm">
+      <div className="flex items-center gap-2">
+        {getStatusIcon()}
+        <span className="font-medium text-[#ECDFCC]">{toolCall.name}</span>
+      </div>
+      <div className="flex-1 text-[#C4B8A8]/80">
+        {getStatusText()}
+      </div>
+    </div>
+  );
 }
 
 export default function ChatInterface() {
@@ -71,11 +116,12 @@ export default function ChatInterface() {
     const assistantMessageId = addMessage({
       type: 'assistant',
       content: '',
-      isStreaming: true
+      isStreaming: true,
+      toolCalls: []
     });
 
     try {
-      // Call our API endpoint
+      // Call our streaming API endpoint
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -88,21 +134,137 @@ export default function ChatInterface() {
         signal: abortControllerRef.current.signal
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get response');
+      }
 
-      if (response.ok) {
-        // Update conversation history if provided
-        if (data.conversationHistory) {
-          setConversationHistory(data.conversationHistory);
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      let buffer = '';
+      let currentContent = '';
+      let currentToolCalls: ToolCall[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const eventData = JSON.parse(line.slice(6));
+              
+              switch (eventData.type) {
+                case 'text_start':
+                  // Text block started
+                  break;
+                  
+                case 'text_delta':
+                  // Append text to current content
+                  currentContent += eventData.data.text;
+                  updateMessage(assistantMessageId, {
+                    content: currentContent,
+                    isStreaming: true,
+                    toolCalls: currentToolCalls
+                  });
+                  break;
+                  
+                case 'text_stop':
+                  // Text block completed
+                  break;
+                  
+                case 'tool_use_start':
+                  // Tool call started
+                  const newTool: ToolCall = {
+                    id: eventData.data.tool.id,
+                    name: eventData.data.tool.name,
+                    input: eventData.data.tool.input,
+                    status: 'executing'
+                  };
+                  currentToolCalls = [...currentToolCalls, newTool];
+                  updateMessage(assistantMessageId, {
+                    content: currentContent,
+                    isStreaming: true,
+                    toolCalls: currentToolCalls
+                  });
+                  break;
+                  
+                case 'tool_execution_start':
+                  // Update tool status to executing
+                  currentToolCalls = currentToolCalls.map(tool =>
+                    tool.id === eventData.data.tool_id
+                      ? { ...tool, status: 'executing' }
+                      : tool
+                  );
+                  updateMessage(assistantMessageId, {
+                    content: currentContent,
+                    isStreaming: true,
+                    toolCalls: currentToolCalls
+                  });
+                  break;
+                  
+                case 'tool_execution_complete':
+                  // Update tool status to completed
+                  currentToolCalls = currentToolCalls.map(tool =>
+                    tool.id === eventData.data.tool_id
+                      ? { ...tool, status: 'completed' }
+                      : tool
+                  );
+                  updateMessage(assistantMessageId, {
+                    content: currentContent,
+                    isStreaming: true,
+                    toolCalls: currentToolCalls
+                  });
+                  break;
+                  
+                case 'tool_execution_error':
+                  // Update tool status to error
+                  currentToolCalls = currentToolCalls.map(tool =>
+                    tool.id === eventData.data.tool_id
+                      ? { ...tool, status: 'error', error: eventData.data.error }
+                      : tool
+                  );
+                  updateMessage(assistantMessageId, {
+                    content: currentContent,
+                    isStreaming: true,
+                    toolCalls: currentToolCalls
+                  });
+                  break;
+                  
+                case 'complete':
+                  // Streaming complete
+                  updateMessage(assistantMessageId, {
+                    content: currentContent,
+                    isStreaming: false,
+                    toolCalls: currentToolCalls
+                  });
+                  
+                  // Update conversation history
+                  setConversationHistory(prev => [
+                    ...prev,
+                    { role: 'user', content: userMessage },
+                    { role: 'assistant', content: currentContent }
+                  ]);
+                  break;
+                  
+                case 'error':
+                  throw new Error(eventData.data.error);
+              }
+            } catch (parseError) {
+              console.error('Error parsing streaming data:', parseError);
+            }
+          }
         }
-
-        // Update the assistant message with the response
-        updateMessage(assistantMessageId, {
-          content: data.response,
-          isStreaming: false
-        });
-      } else {
-        throw new Error(data.error || 'Failed to get response');
       }
 
     } catch (err) {
@@ -196,18 +358,30 @@ export default function ChatInterface() {
                       : "bg-[#1A1C20] text-[#ECDFCC] rounded-bl-md border border-[#1A1C20]/50"
                   )}>
                     {message.type === 'assistant' ? (
-                      message.content ? (
-                        <MarkdownRenderer content={message.content} />
-                      ) : message.isStreaming ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-[#ECDFCC]">Thinking</span>
-                          <div className="flex gap-1">
-                            <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce"></div>
-                            <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="space-y-3">
+                        {/* Tool calls section */}
+                        {message.toolCalls && message.toolCalls.length > 0 && (
+                          <div className="space-y-2">
+                            {message.toolCalls.map((toolCall) => (
+                              <ToolCallDisplay key={toolCall.id} toolCall={toolCall} />
+                            ))}
                           </div>
-                        </div>
-                      ) : null
+                        )}
+                        
+                        {/* Content section */}
+                        {message.content ? (
+                          <MarkdownRenderer content={message.content} />
+                        ) : message.isStreaming ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-[#ECDFCC]">Thinking</span>
+                            <div className="flex gap-1">
+                              <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce"></div>
+                              <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                              <div className="w-1 h-1 bg-[#697565] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
                     ) : (
                       <div className="whitespace-pre-wrap text-sm leading-relaxed text-[#ECDFCC]">
                         {message.content}
