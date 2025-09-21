@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 
@@ -76,14 +75,34 @@ export default function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const messageCounterRef = useRef<number>(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+    }
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [input]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
 
   const addMessage = (message: Omit<Message, 'id' | 'timestamp'>) => {
     messageCounterRef.current += 1;
@@ -488,17 +507,21 @@ export default function ChatInterface() {
             </div>
           )}
           
-          <form onSubmit={handleSubmit} className="flex gap-3">
+          <form onSubmit={handleSubmit} className="flex gap-3 items-end">
             <div className="flex-1 relative">
-              <Input
+              <textarea
+                ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Message Fantasy Football AI..."
                 disabled={isLoading}
-                className="w-full h-14 text-base pl-4 pr-12 rounded-2xl border-[#1A1C20]/50 bg-[#1A1C20]/30 backdrop-blur-sm focus:bg-[#1A1C20]/50 focus:border-[#697565]/50 transition-all duration-200"
+                rows={1}
+                className="w-full min-h-[56px] max-h-[200px] text-base pl-4 pr-12 py-4 rounded-2xl border border-[#1A1C20]/50 bg-[#1A1C20]/30 backdrop-blur-sm focus:bg-[#1A1C20]/50 focus:border-[#697565]/50 transition-all duration-200 resize-none overflow-hidden text-[#ECDFCC] placeholder:text-[#C4B8A8]/50 focus:outline-none"
+                style={{ lineHeight: '1.5' }}
               />
               {input.trim() && !isLoading && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="absolute right-3 bottom-3">
                   <button
                     type="submit"
                     className="w-8 h-8 rounded-full bg-[#697565] hover:bg-[#697565]/90 flex items-center justify-center transition-colors duration-200 shadow-sm"
@@ -514,7 +537,7 @@ export default function ChatInterface() {
                 variant="outline"
                 size="default"
                 onClick={handleStop}
-                className="h-14 px-6 rounded-2xl"
+                className="min-h-[56px] px-6 rounded-2xl"
               >
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-[#ECDFCC] border-t-transparent rounded-full animate-spin"></div>
