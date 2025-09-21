@@ -112,8 +112,9 @@ When using tools, make sure to interpret the results and provide helpful analysi
         try {
           let conversationMessages = [...messages];
           
-          // Handle tool calls in a loop (up to 10 iterations to prevent infinite loops)
-          for (let iteration = 0; iteration < 10; iteration++) {
+          // Handle tool calls in a loop (up to 100 iterations to prevent infinite loops)
+          // TODO: MAKE THE TOOL CALL LIMIT DEPENDENT ON THE USER'S SUBSCRIPTION
+          for (let iteration = 0; iteration < 100; iteration++) {
             // Make streaming request to Claude
             const stream = await anthropic.messages.create({
               model: 'claude-sonnet-4-20250514',
