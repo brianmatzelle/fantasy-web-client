@@ -412,7 +412,8 @@ export default function ChatInterface() {
                   Welcome to Fantasy Football AI
                 </h2>
                 <p className="text-[#C4B8A8]/90 max-w-lg mx-auto text-lg leading-relaxed">
-                  Your intelligent assistant for managing your ESPN Fantasy Football team. Get insights on roster decisions, matchups, and player analysis.
+                  <span className="hidden sm:inline">Your intelligent assistant for managing your ESPN Fantasy Football team. Get insights on roster decisions, matchups, and player analysis.</span>
+                  <span className="sm:hidden">Your intelligent assistant for managing your ESPN Fantasy Football team.</span>
                 </p>
               </div>
             </div>
@@ -485,9 +486,9 @@ export default function ChatInterface() {
       {/* Input Area */}
       <div className="border-t border-[#1A1C20]/50 bg-[#0F1014] shadow-lg">
         <div className="max-w-4xl mx-auto p-6">
-          {/* Quick Start Prompts - moved here above input */}
+          {/* Quick Start Prompts - hidden on mobile */}
           {messages.length === 0 && (
-            <div className="mb-6 space-y-4">
+            <div className="mb-6 space-y-4 hidden sm:block">
               <p className="text-sm font-medium text-[#C4B8A8]/80 text-center">Get started with these questions:</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {quickPrompts.map((prompt) => (
