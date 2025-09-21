@@ -14,13 +14,20 @@ interface ToolCall {
   error?: string;
 }
 
+interface ContentBlock {
+  type: 'text' | 'tool_call';
+  id: string;
+  content?: string;
+  toolCall?: ToolCall;
+}
+
 interface Message {
   id: string;
   type: 'user' | 'assistant';
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
-  toolCalls?: ToolCall[];
+  contentBlocks?: ContentBlock[];
 }
 
 // Tool Call Component
@@ -117,7 +124,7 @@ export default function ChatInterface() {
       type: 'assistant',
       content: '',
       isStreaming: true,
-      toolCalls: []
+      contentBlocks: []
     });
 
     try {
@@ -148,7 +155,8 @@ export default function ChatInterface() {
 
       let buffer = '';
       let currentContent = '';
-      let currentToolCalls: ToolCall[] = [];
+      let currentContentBlocks: ContentBlock[] = [];
+      let currentTextBlockId: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -166,78 +174,131 @@ export default function ChatInterface() {
               
               switch (eventData.type) {
                 case 'text_start':
-                  // Text block started
+                  // Start a new text block
+                  currentTextBlockId = `text-${Date.now()}-${Math.random()}`;
+                  currentContentBlocks = [
+                    ...currentContentBlocks,
+                    {
+                      type: 'text',
+                      id: currentTextBlockId,
+                      content: ''
+                    }
+                  ];
                   break;
                   
                 case 'text_delta':
-                  // Append text to current content
+                  // Append text to current content and current text block
                   currentContent += eventData.data.text;
+                  
+                  if (currentTextBlockId) {
+                    currentContentBlocks = currentContentBlocks.map(block =>
+                      block.id === currentTextBlockId
+                        ? { ...block, content: (block.content || '') + eventData.data.text }
+                        : block
+                    );
+                  }
+                  
                   updateMessage(assistantMessageId, {
                     content: currentContent,
                     isStreaming: true,
-                    toolCalls: currentToolCalls
+                    contentBlocks: currentContentBlocks
                   });
                   break;
                   
                 case 'text_stop':
                   // Text block completed
+                  currentTextBlockId = null;
                   break;
                   
                 case 'tool_use_start':
-                  // Tool call started
+                  // Add tool call to content blocks
                   const newTool: ToolCall = {
                     id: eventData.data.tool.id,
                     name: eventData.data.tool.name,
                     input: eventData.data.tool.input,
                     status: 'executing'
                   };
-                  currentToolCalls = [...currentToolCalls, newTool];
+                  
+                  currentContentBlocks = [
+                    ...currentContentBlocks,
+                    {
+                      type: 'tool_call',
+                      id: eventData.data.tool.id,
+                      toolCall: newTool
+                    }
+                  ];
+                  
                   updateMessage(assistantMessageId, {
                     content: currentContent,
                     isStreaming: true,
-                    toolCalls: currentToolCalls
+                    contentBlocks: currentContentBlocks
                   });
                   break;
                   
                 case 'tool_execution_start':
                   // Update tool status to executing
-                  currentToolCalls = currentToolCalls.map(tool =>
-                    tool.id === eventData.data.tool_id
-                      ? { ...tool, status: 'executing' }
-                      : tool
-                  );
+                  currentContentBlocks = currentContentBlocks.map(block => {
+                    if (block.type === 'tool_call' && block.toolCall?.id === eventData.data.tool_id) {
+                      return {
+                        ...block,
+                        toolCall: {
+                          ...block.toolCall,
+                          status: 'executing' as const
+                        }
+                      };
+                    }
+                    return block;
+                  });
+                  
                   updateMessage(assistantMessageId, {
                     content: currentContent,
                     isStreaming: true,
-                    toolCalls: currentToolCalls
+                    contentBlocks: currentContentBlocks
                   });
                   break;
                   
                 case 'tool_execution_complete':
                   // Update tool status to completed
-                  currentToolCalls = currentToolCalls.map(tool =>
-                    tool.id === eventData.data.tool_id
-                      ? { ...tool, status: 'completed' }
-                      : tool
-                  );
+                  currentContentBlocks = currentContentBlocks.map(block => {
+                    if (block.type === 'tool_call' && block.toolCall?.id === eventData.data.tool_id) {
+                      return {
+                        ...block,
+                        toolCall: {
+                          ...block.toolCall,
+                          status: 'completed' as const
+                        }
+                      };
+                    }
+                    return block;
+                  });
+                  
                   updateMessage(assistantMessageId, {
                     content: currentContent,
                     isStreaming: true,
-                    toolCalls: currentToolCalls
+                    contentBlocks: currentContentBlocks
                   });
                   break;
                   
                 case 'tool_execution_error':
                   // Update tool status to error
-                  currentToolCalls = currentToolCalls.map(tool =>
-                    tool.id === eventData.data.tool_id
-                      ? { ...tool, status: 'error', error: eventData.data.error }
-                      : tool
-                  );
+                  currentContentBlocks = currentContentBlocks.map(block => {
+                    if (block.type === 'tool_call' && block.toolCall?.id === eventData.data.tool_id) {
+                      return {
+                        ...block,
+                        toolCall: {
+                          ...block.toolCall,
+                          status: 'error' as const,
+                          error: eventData.data.error
+                        }
+                      };
+                    }
+                    return block;
+                  });
+                  
                   updateMessage(assistantMessageId, {
                     content: currentContent,
                     isStreaming: true,
-                    toolCalls: currentToolCalls
+                    contentBlocks: currentContentBlocks
                   });
                   break;
                   
@@ -246,7 +307,7 @@ export default function ChatInterface() {
                   updateMessage(assistantMessageId, {
                     content: currentContent,
                     isStreaming: false,
-                    toolCalls: currentToolCalls
+                    contentBlocks: currentContentBlocks
                   });
                   
                   // Update conversation history
@@ -359,17 +420,18 @@ export default function ChatInterface() {
                   )}>
                     {message.type === 'assistant' ? (
                       <div className="space-y-3">
-                        {/* Tool calls section */}
-                        {message.toolCalls && message.toolCalls.length > 0 && (
-                          <div className="space-y-2">
-                            {message.toolCalls.map((toolCall) => (
-                              <ToolCallDisplay key={toolCall.id} toolCall={toolCall} />
-                            ))}
-                          </div>
-                        )}
-                        
-                        {/* Content section */}
-                        {message.content ? (
+                        {/* Render content blocks in chronological order */}
+                        {message.contentBlocks && message.contentBlocks.length > 0 ? (
+                          message.contentBlocks.map((block) => (
+                            <div key={block.id}>
+                              {block.type === 'tool_call' && block.toolCall ? (
+                                <ToolCallDisplay toolCall={block.toolCall} />
+                              ) : block.type === 'text' && block.content ? (
+                                <MarkdownRenderer content={block.content} />
+                              ) : null}
+                            </div>
+                          ))
+                        ) : message.content ? (
                           <MarkdownRenderer content={message.content} />
                         ) : message.isStreaming ? (
                           <div className="flex items-center gap-2">
