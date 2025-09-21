@@ -154,7 +154,7 @@ When using tools, make sure to interpret the results and provide helpful analysi
             });
 
             let hasToolUse = false;
-            let currentContent: any[] = [];
+            let currentContent: Anthropic.Messages.ContentBlockParam[] = [];
             
             // Process streaming response
             for await (const messageStreamEvent of stream) {

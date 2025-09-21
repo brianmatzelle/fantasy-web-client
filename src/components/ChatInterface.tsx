@@ -257,14 +257,14 @@ export default function ChatInterface() {
                 case 'tool_execution_start':
                   // Update tool status to executing
                   currentContentBlocks = currentContentBlocks.map(block => {
-                    if (block.type === 'tool_call' && block.toolCall?.id === eventData.data.tool_id) {
+                    if (block.type === 'tool_call' && block.toolCall && block.toolCall.id === eventData.data.tool_id) {
                       return {
                         ...block,
                         toolCall: {
                           ...block.toolCall,
                           status: 'executing' as const
                         }
-                      };
+                      } as ContentBlock;
                     }
                     return block;
                   });
@@ -279,14 +279,14 @@ export default function ChatInterface() {
                 case 'tool_execution_complete':
                   // Update tool status to completed
                   currentContentBlocks = currentContentBlocks.map(block => {
-                    if (block.type === 'tool_call' && block.toolCall?.id === eventData.data.tool_id) {
+                    if (block.type === 'tool_call' && block.toolCall && block.toolCall.id === eventData.data.tool_id) {
                       return {
                         ...block,
                         toolCall: {
                           ...block.toolCall,
                           status: 'completed' as const
                         }
-                      };
+                      } as ContentBlock;
                     }
                     return block;
                   });
@@ -301,7 +301,7 @@ export default function ChatInterface() {
                 case 'tool_execution_error':
                   // Update tool status to error
                   currentContentBlocks = currentContentBlocks.map(block => {
-                    if (block.type === 'tool_call' && block.toolCall?.id === eventData.data.tool_id) {
+                    if (block.type === 'tool_call' && block.toolCall && block.toolCall.id === eventData.data.tool_id) {
                       return {
                         ...block,
                         toolCall: {
@@ -309,7 +309,7 @@ export default function ChatInterface() {
                           status: 'error' as const,
                           error: eventData.data.error
                         }
-                      };
+                      } as ContentBlock;
                     }
                     return block;
                   });
