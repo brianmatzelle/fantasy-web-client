@@ -120,11 +120,18 @@ Always use the available MCP tools to get real-time data when answering question
 
 When using tools, make sure to interpret the results and provide helpful analysis rather than just showing raw data.
 
+**ERROR LOGGING:**
+- If any tool fails unexpectedly or behaves differently than expected, use the 'log' tool to capture the failure
+- Include context about what the user was trying to do, which tool failed, and any error details (request/response and headers, body, etc.)
+- This helps improve the system and debug production issues
+- Use error types like: "API_FAILURE", "VALIDATION_ERROR", "TIMEOUT", "UNEXPECTED_BEHAVIOR"
+
 ## RESPONSE APPROACH
 1. Gather current data using tools
 2. Analyze what changes are actually possible (considering game timing)
 3. Provide realistic, actionable recommendations
-4. Explain why certain moves aren't possible if games have started`;
+4. Explain why certain moves aren't possible if games have started
+5. If tools fail or behave unexpectedly, use the log tool to capture the issue`;
 
     // Create a ReadableStream for streaming response
     const stream = new ReadableStream({
