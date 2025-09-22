@@ -56,12 +56,17 @@ function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
   const canExpand = toolCall.status === 'completed' || toolCall.status === 'error';
 
   return (
-    <div className="rounded-lg bg-[#1A1C20]/50 border border-[#1A1C20]/30 text-sm">
+    <div className={cn(
+      "rounded-lg bg-[#1A1C20]/50 border text-sm transition-all duration-200",
+      canExpand 
+        ? "border-[#1A1C20]/30 hover:border-[#697565]/40 hover:shadow-sm" 
+        : "border-[#1A1C20]/30"
+    )}>
       {/* Header - always visible */}
       <div 
         className={cn(
-          "flex items-center gap-3 p-3",
-          canExpand && "cursor-pointer hover:bg-[#1A1C20]/70 transition-colors"
+          "flex items-center gap-3 p-3 rounded-lg transition-all duration-200",
+          canExpand && "cursor-pointer hover:bg-[#1A1C20]/80"
         )}
         onClick={canExpand ? () => setIsExpanded(!isExpanded) : undefined}
       >
