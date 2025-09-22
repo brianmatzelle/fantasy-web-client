@@ -11,6 +11,7 @@ interface ToolCall {
   input: Record<string, unknown>;
   status: 'executing' | 'completed' | 'error';
   error?: string;
+  result?: string;
 }
 
 interface ContentBlock {
@@ -31,6 +32,8 @@ interface Message {
 
 // Tool Call Component
 function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const getStatusIcon = () => {
     switch (toolCall.status) {
       case 'executing':
@@ -42,26 +45,82 @@ function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
     }
   };
 
-  const getStatusText = () => {
-    switch (toolCall.status) {
-      case 'executing':
-        return 'Running...';
-      case 'completed':
-        return 'Completed';
-      case 'error':
-        return `Error: ${toolCall.error}`;
+  const formatJson = (obj: unknown) => {
+    try {
+      return JSON.stringify(obj, null, 2);
+    } catch {
+      return String(obj);
     }
   };
 
+  const canExpand = toolCall.status === 'completed' || toolCall.status === 'error';
+
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg bg-[#1A1C20]/50 border border-[#1A1C20]/30 text-sm">
-      <div className="flex items-center gap-2">
-        {getStatusIcon()}
-        <span className="font-medium text-[#ECDFCC]">{toolCall.name}</span>
+    <div className="rounded-lg bg-[#1A1C20]/50 border border-[#1A1C20]/30 text-sm">
+      {/* Header - always visible */}
+      <div 
+        className={cn(
+          "flex items-center gap-3 p-3",
+          canExpand && "cursor-pointer hover:bg-[#1A1C20]/70 transition-colors"
+        )}
+        onClick={canExpand ? () => setIsExpanded(!isExpanded) : undefined}
+      >
+        {/* Icon and tool name */}
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded bg-[#2A2D35] flex items-center justify-center">
+            <span className="text-[#ECDFCC] text-xs font-medium">E</span>
+          </div>
+          <span className="font-medium text-[#ECDFCC]">{toolCall.name}</span>
+        </div>
+        
+        {/* Status */}
+        <div className="flex-1 flex items-center gap-2">
+          {getStatusIcon()}
+          <span className="text-[#C4B8A8]/80">
+            {toolCall.status === 'executing' ? 'Running...' : 
+             toolCall.status === 'completed' ? 'Completed' :
+             `Error: ${toolCall.error}`}
+          </span>
+        </div>
+
+        {/* Expand/collapse arrow */}
+        {canExpand && (
+          <div className="text-[#C4B8A8]/60">
+            {isExpanded ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M4 10l4-4 4 4H4z"/>
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M4 6l4 4 4-4H4z"/>
+              </svg>
+            )}
+          </div>
+        )}
       </div>
-      <div className="flex-1 text-[#C4B8A8]/80">
-        {getStatusText()}
-      </div>
+
+      {/* Expandable content */}
+      {isExpanded && canExpand && (
+        <div className="border-t border-[#1A1C20]/50">
+          {/* Request section */}
+          <div className="p-4">
+            <h4 className="text-[#C4B8A8]/90 font-medium mb-2">Request</h4>
+            <pre className="text-xs text-[#C4B8A8]/80 bg-[#0F1014] rounded p-3 overflow-x-auto">
+              <code>{formatJson(toolCall.input)}</code>
+            </pre>
+          </div>
+
+          {/* Response section */}
+          {(toolCall.result || toolCall.error) && (
+            <div className="p-4 pt-0">
+              <h4 className="text-[#C4B8A8]/90 font-medium mb-2">Response</h4>
+              <pre className="text-xs text-[#C4B8A8]/80 bg-[#0F1014] rounded p-3 overflow-x-auto">
+                <code>{toolCall.error || toolCall.result}</code>
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -277,14 +336,15 @@ export default function ChatInterface() {
                   break;
                   
                 case 'tool_execution_complete':
-                  // Update tool status to completed
+                  // Update tool status to completed and store result
                   currentContentBlocks = currentContentBlocks.map(block => {
                     if (block.type === 'tool_call' && block.toolCall && block.toolCall.id === eventData.data.tool_id) {
                       return {
                         ...block,
                         toolCall: {
                           ...block.toolCall,
-                          status: 'completed' as const
+                          status: 'completed' as const,
+                          result: eventData.data.result
                         }
                       } as ContentBlock;
                     }

@@ -230,7 +230,10 @@ When using tools, make sure to interpret the results and provide helpful analysi
                     sendEvent('tool_execution_complete', {
                       tool_name: block.name,
                       tool_id: block.id,
-                      success: !toolResult.isError
+                      success: !toolResult.isError,
+                      result: toolResult.isError ? 
+                        `Error: ${toolResult.content}` : 
+                        JSON.stringify(toolResult.content, null, 2)
                     });
                     
                     toolResults.push({
