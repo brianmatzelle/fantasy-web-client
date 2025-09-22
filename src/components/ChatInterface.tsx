@@ -75,7 +75,7 @@ function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
           <div className="w-6 h-6 rounded bg-[#2A2D35] flex items-center justify-center">
             <span className="text-[#ECDFCC] text-xs font-medium">E</span>
           </div>
-          <span className="font-medium text-[#ECDFCC]">{toolCall.name}</span>
+          <span className="font-medium text-[#ECDFCC]">{toolCall.name.replace(/_/g, ' ')}</span>
         </div>
         
         {/* Status */}
