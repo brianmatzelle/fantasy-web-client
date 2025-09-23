@@ -35,3 +35,5 @@ export async function getDb(): Promise<Db> {
   return client.db(process.env.MONGODB_DB || 'fantasy-football-ai');
 }
 
+
+
