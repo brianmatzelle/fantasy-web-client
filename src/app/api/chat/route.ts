@@ -161,7 +161,8 @@ When using tools, make sure to interpret the results and provide helpful analysi
             });
 
             let hasToolUse = false;
-            let currentContent: Anthropic.Messages.ContentBlockParam[] = [];
+            let currentContent: (Anthropic.Messages.ContentBlockParam | undefined)[] = [];
+            let toolInputBuffers: Record<number, string> = {}; // Buffer for accumulating tool input JSON
             
             // Process streaming response
             for await (const messageStreamEvent of stream) {
@@ -180,7 +181,13 @@ When using tools, make sure to interpret the results and provide helpful analysi
                       input: messageStreamEvent.content_block.input
                     }
                   });
-                  currentContent.push(messageStreamEvent.content_block);
+                  // Initialize the content block and input buffer
+                  // Ensure the array is large enough and place the block at the correct index
+                  while (currentContent.length <= messageStreamEvent.index) {
+                    currentContent.push(undefined);
+                  }
+                  currentContent[messageStreamEvent.index] = messageStreamEvent.content_block;
+                  toolInputBuffers[messageStreamEvent.index] = '';
                 }
               } else if (messageStreamEvent.type === 'content_block_delta') {
                 if (messageStreamEvent.delta.type === 'text_delta') {
@@ -189,6 +196,10 @@ When using tools, make sure to interpret the results and provide helpful analysi
                     text: messageStreamEvent.delta.text
                   });
                 } else if (messageStreamEvent.delta.type === 'input_json_delta') {
+                  // Accumulate the JSON input for this tool use block
+                  toolInputBuffers[messageStreamEvent.index] = 
+                    (toolInputBuffers[messageStreamEvent.index] || '') + messageStreamEvent.delta.partial_json;
+                  
                   sendEvent('tool_input_delta', {
                     index: messageStreamEvent.index,
                     partial_json: messageStreamEvent.delta.partial_json
@@ -198,11 +209,25 @@ When using tools, make sure to interpret the results and provide helpful analysi
                 if (messageStreamEvent.index < currentContent.length && 
                     currentContent[messageStreamEvent.index]?.type === 'text') {
                   sendEvent('text_stop', { index: messageStreamEvent.index });
-                } else {
+                } else if (currentContent[messageStreamEvent.index]?.type === 'tool_use') {
+                  // Parse the accumulated JSON input for this tool use block
+                  const toolBlock = currentContent[messageStreamEvent.index] as Anthropic.Messages.ToolUseBlockParam;
+                  const accumulatedInput = toolInputBuffers[messageStreamEvent.index];
+                  
+                  if (accumulatedInput) {
+                    try {
+                      toolBlock.input = JSON.parse(accumulatedInput);
+                    } catch (error) {
+                      console.error('Failed to parse tool input JSON:', accumulatedInput, error);
+                      toolBlock.input = {};
+                    }
+                  }
+                  
                   sendEvent('tool_use_stop', { index: messageStreamEvent.index });
                 }
               } else if (messageStreamEvent.type === 'message_start') {
                 currentContent = [];
+                toolInputBuffers = {};
               } else if (messageStreamEvent.type === 'message_delta') {
                 // Handle message-level updates if needed
               } else if (messageStreamEvent.type === 'message_stop') {
@@ -216,7 +241,7 @@ When using tools, make sure to interpret the results and provide helpful analysi
               const toolResults = [];
               
               for (const block of currentContent) {
-                if (block.type === 'tool_use' && block.id && block.name) {
+                if (block && block.type === 'tool_use' && block.id && block.name) {
                   sendEvent('tool_execution_start', {
                     tool_name: block.name,
                     tool_id: block.id
@@ -262,11 +287,13 @@ When using tools, make sure to interpret the results and provide helpful analysi
               }
 
               // Add assistant message and tool results to conversation
+              // Filter out undefined elements that were added for proper indexing
+              const validContent = currentContent.filter(block => block !== undefined);
               conversationMessages = [
                 ...conversationMessages,
                 {
                   role: 'assistant',
-                  content: currentContent
+                  content: validContent
                 }
               ];
 
